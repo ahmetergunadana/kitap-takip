@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: kitap-takip
+    runtime: node
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd backend && node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production

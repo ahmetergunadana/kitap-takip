@@ -1,0 +1,13 @@
+{
+  "name": "kitap-takip",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd backend && node index.js",
+    "dev": "cd backend && node --watch index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
