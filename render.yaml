@@ -3,8 +3,8 @@ services:
     name: kitap-takip
     runtime: node
     plan: free
-    buildCommand: cd frontend && npm install --include=dev && npm run build && cd ../backend && npm install
-    startCommand: cd backend && node index.js
+    buildCommand: npm install --prefix frontend --include=dev && npm run build --prefix frontend && npm install --prefix backend
+    startCommand: node backend/index.js
     envVars:
       - key: NODE_ENV
         value: production
