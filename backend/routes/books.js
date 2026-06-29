@@ -1,17 +1,28 @@
 const express = require("express");
 
-module.exports = function (db) {
+function rowToObject(values) {
+  return values.map(([id, title, author, status, rating, created_at]) => ({
+    id,
+    title,
+    author,
+    status,
+    rating,
+    created_at,
+  }));
+}
+
+module.exports = function (db, saveDb) {
   const router = express.Router();
 
   router.get("/", (req, res) => {
     const { status } = req.query;
-    let books;
+    let result;
     if (status) {
-      books = db.prepare("SELECT * FROM books WHERE status = ? ORDER BY created_at DESC").all(status);
+      result = db.exec("SELECT * FROM books WHERE status = ? ORDER BY created_at DESC", [status]);
     } else {
-      books = db.prepare("SELECT * FROM books ORDER BY created_at DESC").all();
+      result = db.exec("SELECT * FROM books ORDER BY created_at DESC");
     }
-    res.json(books);
+    res.json(result.length ? rowToObject(result[0].values) : []);
   });
 
   router.post("/", (req, res) => {
@@ -19,31 +30,41 @@ module.exports = function (db) {
     if (!title || !author || !status || rating == null) {
       return res.status(400).json({ error: "title, author, status, and rating are required" });
     }
-    const result = db.prepare("INSERT INTO books (title, author, status, rating) VALUES (?, ?, ?, ?)").run(title, author, status, rating);
-    const book = db.prepare("SELECT * FROM books WHERE id = ?").get(result.lastInsertRowid);
-    res.status(201).json(book);
+    db.run("INSERT INTO books (title, author, status, rating) VALUES (?, ?, ?, ?)", [title, author, status, Number(rating)]);
+    saveDb();
+    const result = db.exec("SELECT * FROM books ORDER BY id DESC LIMIT 1");
+    const books = rowToObject(result[0].values);
+    res.status(201).json(books[0]);
   });
 
   router.put("/:id", (req, res) => {
-    const { id } = req.params;
-    const { title, author, status, rating } = req.body;
-    const existing = db.prepare("SELECT * FROM books WHERE id = ?").get(id);
-    if (!existing) {
+    const id = Number(req.params.id);
+    const existing = db.exec("SELECT * FROM books WHERE id = ?", [id]);
+    if (!existing.length || !existing[0].values.length) {
       return res.status(404).json({ error: "Book not found" });
     }
-    db.prepare("UPDATE books SET title = ?, author = ?, status = ?, rating = ? WHERE id = ?")
-      .run(title ?? existing.title, author ?? existing.author, status ?? existing.status, rating ?? existing.rating, id);
-    const book = db.prepare("SELECT * FROM books WHERE id = ?").get(id);
-    res.json(book);
+    const row = existing[0].values[0];
+    const { title, author, status, rating } = req.body;
+    db.run("UPDATE books SET title = ?, author = ?, status = ?, rating = ? WHERE id = ?", [
+      title ?? row[1],
+      author ?? row[2],
+      status ?? row[3],
+      rating ?? row[4],
+      id,
+    ]);
+    saveDb();
+    const updated = db.exec("SELECT * FROM books WHERE id = ?", [id]);
+    res.json(rowToObject(updated[0].values)[0]);
   });
 
   router.delete("/:id", (req, res) => {
-    const { id } = req.params;
-    const existing = db.prepare("SELECT * FROM books WHERE id = ?").get(id);
-    if (!existing) {
+    const id = Number(req.params.id);
+    const existing = db.exec("SELECT * FROM books WHERE id = ?", [id]);
+    if (!existing.length || !existing[0].values.length) {
       return res.status(404).json({ error: "Book not found" });
     }
-    db.prepare("DELETE FROM books WHERE id = ?").run(id);
+    db.run("DELETE FROM books WHERE id = ?", [id]);
+    saveDb();
     res.status(204).end();
   });
 
